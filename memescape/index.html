@@ -111,7 +111,7 @@ var video_description =
 //.classed("video_description")
 
 function show_video(video) {
-  var autoplay = 0
+  var autoplay = 1
   video_url = '//www.youtube.com/embed/' + video['video.id']
   video_player.html('<iframe width="' + player_width + '" height="' + player_height + '" src="' + video_url + '?rel=0&autoplay=' + autoplay + '" frameborder="0" allowfullscreen></iframe>')
   video_title.text(video['video.title'])
