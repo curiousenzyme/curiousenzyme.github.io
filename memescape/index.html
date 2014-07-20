@@ -29,6 +29,17 @@
   vector-effect: non-scaling-stroke;
 }
 
+.line {
+  fill: none;
+  stroke: brown;
+  stroke-width: 0.9px;
+  opacity: 0.15;
+}
+.noline {
+  fill: none;
+  stroke: none;
+}
+
 </style>
 <body>
 
@@ -50,6 +61,16 @@
 
 <script src="http://d3js.org/d3.v3.min.js"></script>
 <script>
+function getQueryVariable(variable) {
+       var query = window.location.search.substring(1);
+       var vars = query.split("&");
+       for (var i=0;i<vars.length;i++) {
+               var pair = vars[i].split("=");
+               if(pair[0] == variable){return pair[1];}
+       }
+       return(false);
+}
+
 
 function draw_grid_lines(container, width, height, scaling_factor) {
     container.append("g")
@@ -111,7 +132,7 @@ var video_description =
 //.classed("video_description")
 
 function show_video(video) {
-  var autoplay = 1
+  var autoplay = 0
   video_url = '//www.youtube.com/embed/' + video['video.id']
   video_player.html('<iframe width="' + player_width + '" height="' + player_height + '" src="' + video_url + '?rel=0&autoplay=' + autoplay + '" frameborder="0" allowfullscreen></iframe>')
   video_title.text(video['video.title'])
@@ -144,19 +165,55 @@ var scaling_factor = height/70
 var container = svg.append("g");
 
 
+var points = []
+
+var line = d3.svg.line();
+line.interpolate("cardinal")
+var path = container.append("path")
+   .datum(points)
+   .attr("class", "line")
+   .attr("stroke-dasharray", "2, 2")
+
+var dummyPath = container.append("path")
+   .datum(points)
+   .attr("class", "noline")
+path.call(redraw);
+// dummyPath.call(redraw)
+
+var previousLength = 0
+function redraw() {
+  dummyPath.attr("d", line)
+  totalLength = dummyPath.node().getTotalLength()
+
+  path.attr("stroke-dasharray", totalLength + " " + totalLength)
+      .attr("stroke-dashoffset", totalLength - previousLength)
+      .transition()
+        .attr("d", line)
+        .duration(1500)
+        .attr("stroke-dashoffset", 0)
+
+  previousLength = totalLength
+}
+
+
+
 var selected_video = null
 function set_video_selected(d, i) {
   // reset previously selected video
   if (selected_video) {
-    selected_video.attr('r', 1)
-    selected_video.style('fill', 'steelblue')
+    selected_video.attr('r', video_radius(selected_video.data()[0]))
+    selected_video.style('fill', 'lightsteelblue')
   }
   // set newly selected video
   parent = d3.select(d3.event.srcElement.parentNode)
   circle = parent.select('circle')
   selected_video = circle
-  selected_video.attr('r', 2)
+  selected_video.attr('r', video_radius(d)*1.2)
   selected_video.style('fill', 'red')
+
+  // add this video point to the line-of-visited-videos
+  points.push([selected_video.attr('cx'), selected_video.attr('cy')])
+  redraw()
 }
 
 function event_video_clicked(d, i) { show_video(d);
@@ -167,10 +224,12 @@ draw_grid_lines(container, width, height, scaling_factor)
 function translate_x(x) {return x * scaling_factor + width/2};
 function translate_y(y) {return y * scaling_factor + height/2};
 function truncate(n, string){
-   if (string.length > n)
-      return string.substring(0,n)+'...';
-   else
-      return string;
+   if (string) {
+     if (string.length > n)
+        return string.substring(0,n)+'...';
+     else
+        return string;
+   } else {return null}
 };
 
 function draw_aura(container, data) {
@@ -209,6 +268,10 @@ function draw_video_titles(container, data) {
       .attr("font-size", "2px")
       .on('click', event_text_clicked);
 }
+function video_radius(d) {
+  if (d['incoming_count']) return d['incoming_count']/ 50 + 1;
+  else return 1.0
+}
 function draw_videos(container, data) {
   c = container.append("g")
       .attr("class", "video")
@@ -216,35 +279,20 @@ function draw_videos(container, data) {
       .data(dots)
     .enter().append("g");
   c.append("circle")
-      .attr("r", 1.0)
+      .attr("r",  function(d) { return video_radius(d)})
       .attr("cx", function(d) { return translate_x(d['coord'][0]); })
       .attr("cy", function(d) { return translate_y(d['coord'][1]); })
-//       .on('click', event_video_clicked);
   c.append("text")
       .attr("x", function(d) { return translate_x(d['coord'][0]) + 1.5; })
       .attr("y", function(d) { return translate_y(d['coord'][1]) + 0.5; })
       .text( function (d) { return truncate(12, d['video.title'])})
       .attr("font-size", "2px");
-//       .on('click', event_text_clicked);
   c.on('click', event_video_clicked);
-//   c.selectAll("circle")
-//       .data(dots)
-//     .enter().append("circle")
-//       .attr("r", 1.0)
-//       .attr("cx", function(d) { return translate_x(d['coord'][0]); })
-//       .attr("cy", function(d) { return translate_y(d['coord'][1]); })
-//       .on('click', event_video_clicked);
-//   c.selectAll("text")
-//       .data(dots)
-//     .enter().append("text")
-//       .attr("x", function(d) { return translate_x(d['coord'][0]) + 1.5; })
-//       .attr("y", function(d) { return translate_y(d['coord'][1]) + 0.5; })
-//       .text( function (d) { return truncate(12, d['video.title'])})
-//       .attr("font-size", "2px")
-//       .on('click', event_text_clicked);
 }
 
-d3.json("encoding.json", function(error, data) {
+file_path = getQueryVariable("data")
+if (!file_path) file_path = "encoding.json"
+d3.json(file_path, function(error, data) {
   // data includes hyperparameters ['params'] and etc
   // data['data']
   // data['params']
@@ -252,20 +300,10 @@ d3.json("encoding.json", function(error, data) {
   dots = data['data']
 
 //   draw_aura(container, dots)
-
-//   draw_video_circles(container, dots)
-
-//   draw_video_titles(container, dots)
   draw_videos(container, dots)
 });
 
 // thumbnail: http://i.ytimg.com/vi/<video-id>/0.jpg
-
-// function dottype(d) {
-//   d.x = +d.x;
-//   d.y = +d.y;
-//   return d;
-// }
 
 function zoomed() {
   container.attr("transform", "translate(" + d3.event.translate + ")scale(" + d3.event.scale + ")");
