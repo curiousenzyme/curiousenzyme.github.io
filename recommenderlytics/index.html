@@ -53,7 +53,7 @@
 #clusterpanel {
   position:absolute;
   float:left;
-  width:34%; height:40%;
+  width:44%; height:40%;
   left:1%;bottom:3%;
   border-style:solid;border-width:thin;
   opacity:0.5;
@@ -205,9 +205,9 @@ function show_video(video) {
 //   video_cluster.text('cluster id:' + video['cluster'])
 }
 var cluster_panel = $("#clusterpanel")
-cluster_panel.append("<h3 class='cluster_panel_title'></h3>")
-cluster_panel.append("<div class='tag_cloud' id='tag_cloud_1' style='padding:3%;float:left;width:44%'></div>")
-cluster_panel.append("<div class='tag_cloud' id='tag_cloud_2' style='padding:3%;float:right;width:44%'></div>")
+cluster_panel.append("<span style='font-weight:bold;padding:1%;display:block' class='cluster_panel_title'></span>")
+cluster_panel.append("<div class='tag_cloud' id='tag_cloud_1' style='padding:2%;float:left;width:44%'></div>")
+cluster_panel.append("<div class='tag_cloud' id='tag_cloud_2' style='padding:2%;float:right;width:44%'></div>")
 var cluster_title = $('.cluster_panel_title')
 var tags1 = $('#tag_cloud_1')
 var tags2 = $('#tag_cloud_2')
@@ -218,7 +218,7 @@ var tags2 = $('#tag_cloud_2')
 // var cluster_tags1 = $(cluster_panel).append("span").text($("hey!"))
 function format_tags(tags) {
   result = ""
-  for (i=0; i!=Math.min(5, tags.length); i++) {
+  for (i=0; i!=Math.min(7, tags.length); i++) {
     text = tags[i][0].join(" ")
     rating = tags[i][1]
     result += "<span>" + text + "</span><span style='float:right'>" + rating.toFixed(2) + "+</span><br>\n"
