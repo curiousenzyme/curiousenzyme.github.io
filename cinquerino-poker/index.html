@@ -1,0 +1,319 @@
+<head>
+    <style>
+        html {
+            background-color:#222;
+        }
+        #ambience {
+            width: 700px;
+            height: 400px;
+            background-image: url("wood-texture.jpg");
+            background-repeat: repeat-x;
+            margin-left: auto;
+            margin-right: auto;
+            padding: 100px 200px 200px 200px;
+            margin-top: 10px;
+            box-shadow: 10px 10px 5px rgba(0, 0, 0, 0.5);
+        }
+        #container {
+
+            width: 700px;
+            height: 400px;
+            margin-top: 5%;
+            border-width: 20px;
+            border-style: solid;
+            border-radius: 10px;
+            border-color: #222222;
+            overflow: hidden;
+            position:relative;
+            margin-left: auto;
+            margin-right: auto;
+            box-shadow: 10px 10px 5px rgba(0, 0, 0, 0.5);
+        }
+
+        #surface {
+            left:0;
+            width:100%;
+            height:100%;
+            position:absolute;
+        }
+        #table {
+            width:100%;
+            height:100%;
+            float:right;
+            position:absolute;
+            background-image:url("Felt-Green.jpg");
+        }
+        #sidepanel {
+            width:20%;
+            height:100%;
+            float:left;
+            position:relative;
+            background-image:url("brushed-steel.jpg");
+            border-right: 5px ridge #222
+        }
+    </style>
+
+    <script src="underscore-min.js"></script>
+    <script src="jquery-2.1.1.min.js"></script>
+    <script src="snap.svg.js"></script>
+
+</head>
+
+<body>
+    <div id="ambience">
+    <div id="container">
+        <div id="table"></div>
+        <div id="sidepanel"></div>
+        <svg id="surface">
+        </svg>
+    </div>
+    </div>
+</body>
+
+<script>
+    var CARD_HEIGHT=90;
+    var CARD_WIDTH = CARD_HEIGHT / 1.47;
+    var CARD_OVERLAP=CARD_HEIGHT / 4;
+
+    var SURFACE_WIDTH = $('#surface')[0].clientWidth;
+    var SURFACE_HEIGHT = $('#surface')[0].clientHeight;
+
+    var CUE_CARD_X = 105;
+    var CUE_CARD_Y = 175;
+    var CUE_CARD_Y = SURFACE_HEIGHT / 2 - (CARD_HEIGHT / 2);
+
+    var cueCard = null;
+    var cueCardImage = null;
+
+    function receiveCueCardMessage(card) {
+        // draw card to Cue position
+        cueCard = card;
+        cueCardImage = drawCardAtCoord(card, CUE_CARD_X, CUE_CARD_Y);
+    }
+
+    function receiveMessage(message) {
+        if (message[0]=='dealCard') {
+            dealCard(message[1]);
+        } else if (message[0]=='cueCard') {
+            receiveCueCardMessage(message[1]);
+        } else {
+            throw new Error("assertion failed! unknown message command: " + message[0]);
+        }
+    }
+    /**
+     * a message is a list of commands.
+     */
+    function receiveMessages(messages) {
+        // take each message, parse the command, and call the appropriate handler
+        messages.map(receiveMessage);
+    }
+
+    function getCueCard() {
+        return cueCard;
+    }
+    function getCueCardImage() {
+
+    }
+
+    /**
+     * receive a message from a remote source to send some card to some lane.
+     */
+    function dealCard(message) {
+        sendCardToLane(message['card'], message['lane']);
+    }
+
+    var cardsInLanes = new Array(10);
+    function getCardsInLane(lane) {
+        if (cardsInLanes[lane]==null) cardsInLanes[lane] = [];
+        return cardsInLanes[lane];
+    }
+
+    function sendCardToLane (card, lane) {
+        // draw the card in the lane
+        coord = getLaneLocation(lane);
+        drawCardAtCoord(card, coord[0], coord[1]);
+
+        getCardsInLane(lane).push(card);
+    }
+
+    /**
+     * Can this lane accept another card right now?
+     */
+    function clickableLane(lane) {
+        // can only assign to lanes with minimum stack size
+        if (lane < 5) {
+            stacksizes = _.range(0, 5).map(function(i){return getCardsInLane(i).length})
+            minSize = Math.min.apply(null, stacksizes)
+            clickedLaneSize = getCardsInLane(lane).length;
+            if (clickedLaneSize==minSize) return true;
+            else return false;
+        } else if (lane < 10) {
+            stacksizes = _.range(5, 10).map(function(i){return getCardsInLane(i).length})
+            minSize = Math.min.apply(null, stacksizes)
+            clickedLaneSize = getCardsInLane(lane).length;
+            if (clickedLaneSize==minSize) return true;
+            else return false;
+        } else {
+            throw new Error("assertion failed! lane should be between 0 and 9 inclusive, but is " + lane);
+        }
+    }
+    /**
+     * user has assigned the cue card to a lane, send it to the server.
+     */
+    function laneClicked (lane) {
+        // validate that there is a cue card
+        cueCard = getCueCard();
+        if (cueCard==null) return;
+
+
+        // animate the card moving
+            // remove card from cue
+            // add card to lane
+        // get the card in cue
+
+        // validate that it's a clickable lane
+        if (!clickableLane(lane)) return;
+        cardsInLane = getCardsInLane(lane);
+        cardsInLane.push(cueCard);
+        laneStackSize = cardsInLane.length;
+
+
+        newCoord = getLaneLocation(lane);
+        cueCardImage.attr('x', newCoord[0]);
+        cueCardImage.attr('y', newCoord[1] + CARD_OVERLAP * (laneStackSize-1));
+
+        cueCard = null;
+        cueCardImage = null;
+
+
+
+        // send a message
+        sendAssignCueToLaneMessage(lane);
+        receiveCueCardMessage(randomCard());
+    }
+
+    /**
+     * send command to server
+     */
+    function sendAssignCueToLaneMessage (lane) {
+        ['assignCueToLane', {'lane': lane}]
+    }
+
+
+    function drawCardAtCoord (card, x_coord, y_coord) {
+        // card is integer =< 1, => 52
+        s = Snap('#cards');
+        g = s.g();
+
+        // convert card number into svg element
+        // card is an assoc array, of card identifier, hidden?, etc
+        console.log(card['id'])
+        image = g.image('resources/' + card['id'] + '.png', x_coord, y_coord, CARD_WIDTH, CARD_HEIGHT);
+        rot = Math.random()*1.0-1
+        image.transform('r' + rot + ',' + (x_coord + CARD_WIDTH/2) + ',' + (y_coord))
+
+        return image;
+    }
+
+    function calcLaneLocations () {
+        var LEFT_MARGIN=200; var RIGHT_MARGIN=20;
+//         var LEFT_MARGIN=20; var RIGHT_MARGIN=20;
+        var BOTTOM_MARGIN=85; var TOP_MARGIN=10;
+
+        width = $('#surface')[0].clientWidth;
+        height = $('#surface')[0].clientHeight;
+
+        console.log(width)
+        var laneLocations =
+            [TOP_MARGIN, height - CARD_HEIGHT-BOTTOM_MARGIN-TOP_MARGIN].map(function (y) {
+                return _.range(LEFT_MARGIN,
+//                                width - CARD_WIDTH - RIGHT_MARGIN,
+                               width,
+                               (width - LEFT_MARGIN - CARD_WIDTH - RIGHT_MARGIN) /4)
+                        .map(function (x) {return [x,y];});
+            });
+        result = laneLocations[0].concat(laneLocations[1]);
+
+        if (result.length!=10) throw new Error("assertion failed! wrong number of lanes in layout. Should be 10 lanes, but is only " + result.length);
+
+        return result;
+    }
+
+    /**
+     * get the coords for a specific lane
+     */
+    function getLaneLocation(lane) {
+        return calcLaneLocations(900, 600)[lane];
+    }
+
+    function randomCard() {
+        id = Math.floor((Math.random() * 52) + 1);
+        return {'id':id};
+    }
+
+    // building page structure
+    s = Snap('#surface');
+    g = s.g();
+    g.attr('id', 'cards');
+    g = s.g();
+    g.attr('id', 'lanes');
+
+    laneCentroids = calcLaneLocations();
+
+    // draw the deck...
+    for (i=10;i!=0;i--) {
+        drawCardAtCoord({'id': 'card_back'}, CUE_CARD_X-(CARD_WIDTH/33)*i, CUE_CARD_Y-(CARD_WIDTH/99)*i)
+    }
+
+    laneCentroids.map(function (coord, index) {
+        var LANE_PADDING = CARD_WIDTH/4
+        s = Snap('#lanes');
+        g = s.g();
+
+        g.rect(coord[0]-LANE_PADDING, coord[1]-LANE_PADDING, CARD_WIDTH+LANE_PADDING*2, CARD_HEIGHT + CARD_OVERLAP*4)
+         .attr({'fill-opacity': 0})
+//          .attr('id', 'lane'+index)
+         .click(function() {
+             laneClicked(index);
+         });
+    });
+
+
+    flopMessage = [
+            ['dealCard', {'card': {'id': 44, 'hidden':false},
+                         'lane': 0}],
+            ['dealCard', {'card': {'id': 24, 'hidden':false},
+                         'lane': 1}],
+            ['dealCard', {'card': {'id': 14, 'hidden':false},
+                         'lane': 2}],
+            ['dealCard', {'card': {'id': 34, 'hidden':false},
+                         'lane': 3}],
+            ['dealCard', {'card': {'id': 47, 'hidden':false},
+                         'lane': 4}],
+            ['dealCard', {'card': {'id': 28, 'hidden':false},
+                         'lane': 5}],
+            ['dealCard', {'card': {'id': 37, 'hidden':false},
+                         'lane': 6}],
+            ['dealCard', {'card': {'id': 22, 'hidden':false},
+                         'lane': 7}],
+            ['dealCard', {'card': {'id': 31, 'hidden':false},
+                         'lane': 8}],
+            ['dealCard', {'card': {'id': 19, 'hidden':false},
+                         'lane': 9}]
+           ];
+
+    receiveMessages(flopMessage);
+    receiveMessage(['cueCard', randomCard()]);
+//     laneClicked(8);
+//     receiveMessage(['cueCard', randomCard()]);
+//     laneClicked(0);
+//     receiveMessage(['cueCard', randomCard()]);
+//     laneClicked(9);
+//     receiveMessage(['cueCard', randomCard()]);
+
+</script>
+
+
+
+
+
