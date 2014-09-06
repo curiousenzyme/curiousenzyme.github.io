@@ -15,9 +15,8 @@
             box-shadow: 10px 10px 5px rgba(0, 0, 0, 0.5);
         }
         #container {
-
             width: 700px;
-            height: 400px;
+            height: 450px;
             margin-top: 5%;
             border-width: 20px;
             border-style: solid;
@@ -71,12 +70,17 @@
 </body>
 
 <script>
-    var CARD_HEIGHT=90;
+    var CARD_HEIGHT=85;
     var CARD_WIDTH = CARD_HEIGHT / 1.47;
     var CARD_OVERLAP=CARD_HEIGHT / 4;
 
     var SURFACE_WIDTH = $('#surface')[0].clientWidth;
     var SURFACE_HEIGHT = $('#surface')[0].clientHeight;
+
+    var LEFT_MARGIN=200; var RIGHT_MARGIN=20;
+    var BOTTOM_MARGIN=85; var TOP_MARGIN=10;
+
+    var SIDEBAR_WIDTH = $('#sidepanel')[0].clientWidth;
 
     var CUE_CARD_X = 105;
     var CUE_CARD_Y = 175;
@@ -179,8 +183,22 @@
 
 
         newCoord = getLaneLocation(lane);
-        cueCardImage.attr('x', newCoord[0]);
-        cueCardImage.attr('y', newCoord[1] + CARD_OVERLAP * (laneStackSize-1));
+//         cueCardImage.animate(attr({'x': newCoord[0],
+//                                    'y': newCoord[1] + CARD_OVERLAP * (laneStackSize-1), } ),
+//                              100
+//                             )
+        newCoord_x = newCoord[0];
+        newCoord_y = newCoord[1] + CARD_OVERLAP * (laneStackSize-1);
+
+//         cueCardImage.animate({'transform': 'r0,'+newCoord_x+','+newCoord_y}, 4000);
+//         cueCardImage.drag();
+//         cueCardImage.transform({'transform': 'r0,'+newCoord_x+','+newCoord_y});
+//         cueCardImage.transform('r90');
+//         cueCardImage.animate({'transform': 't'+newCoord_x+','+newCoord_y}, 300);
+        cueCardImage.animate({'x': newCoord_x,
+                              'y': newCoord_y}, 300);
+//         cueCardImage.attr('x', newCoord_x);
+//         cueCardImage.attr('y', newCoord_y);
 
         cueCard = null;
         cueCardImage = null;
@@ -207,7 +225,6 @@
 
         // convert card number into svg element
         // card is an assoc array, of card identifier, hidden?, etc
-        console.log(card['id'])
         image = g.image('resources/' + card['id'] + '.png', x_coord, y_coord, CARD_WIDTH, CARD_HEIGHT);
         rot = Math.random()*1.0-1
         image.transform('r' + rot + ',' + (x_coord + CARD_WIDTH/2) + ',' + (y_coord))
@@ -216,14 +233,10 @@
     }
 
     function calcLaneLocations () {
-        var LEFT_MARGIN=200; var RIGHT_MARGIN=20;
-//         var LEFT_MARGIN=20; var RIGHT_MARGIN=20;
-        var BOTTOM_MARGIN=85; var TOP_MARGIN=10;
 
         width = $('#surface')[0].clientWidth;
         height = $('#surface')[0].clientHeight;
 
-        console.log(width)
         var laneLocations =
             [TOP_MARGIN, height - CARD_HEIGHT-BOTTOM_MARGIN-TOP_MARGIN].map(function (y) {
                 return _.range(LEFT_MARGIN,
@@ -264,6 +277,79 @@
     for (i=10;i!=0;i--) {
         drawCardAtCoord({'id': 'card_back'}, CUE_CARD_X-(CARD_WIDTH/33)*i, CUE_CARD_Y-(CARD_WIDTH/99)*i)
     }
+
+
+    function drawTurnIndicator () {
+        g = s.g();
+        g.attr('id', 'turn_indicator');
+        line = g.line(SIDEBAR_WIDTH, SURFACE_HEIGHT / 2, SURFACE_WIDTH, SURFACE_HEIGHT / 2)
+        line = g.line(SIDEBAR_WIDTH, SURFACE_HEIGHT / 2, SURFACE_WIDTH, SURFACE_HEIGHT / 2)
+        line.attr({stroke: 'rgba(0, 0, 0, 0.3)'})
+        var TURN_INDICATOR_BANNER_HEIGHT = 60;
+        var TURN_INDICATOR_BANNER_WIDTH = 180;
+        var TURN_INDICATOR_HEIGHT = 15;
+        var TURN_INDICATOR_WIDTH = 150;
+        text = g.text((SURFACE_WIDTH - SIDEBAR_WIDTH) / 2 + SIDEBAR_WIDTH - TURN_INDICATOR_WIDTH/2,
+                       SURFACE_HEIGHT/2+TURN_INDICATOR_HEIGHT/2,
+                       "Your Turn")
+        text.attr({'font-family': 'Garamond',
+                   'font-size':   '26pt',
+                   'font-variant':'small-caps',
+                   'fill':       'rgba(0, 0, 0, 0.6)',
+                  });
+//         text.node.clientHeight
+
+        rect =
+         g.rect((SURFACE_WIDTH - SIDEBAR_WIDTH)/2 + SIDEBAR_WIDTH - TURN_INDICATOR_BANNER_WIDTH/2,
+               SURFACE_HEIGHT / 2 - TURN_INDICATOR_BANNER_HEIGHT/2,
+               TURN_INDICATOR_BANNER_WIDTH,
+               TURN_INDICATOR_BANNER_HEIGHT);
+    //            (SURFACE_WIDTH - SIDEBAR_WIDTH)/2 + SIDEBAR_WIDTH + TURN_INDICATOR_BANNER_WIDTH/2,
+    //            SURFACE_HEIGHT / 2 + TURN_INDICATOR_BANNER_HEIGHT/2);
+        rect.attr({'fill':       'rgba(0, 0, 0, 0.1)',
+                   'stroke':      'rgba(0, 0, 0, 0.8)',
+                  })
+
+        var TURN_COUNTDOWN_BANNER_HEIGHT = 40;
+        var TURN_COUNTDOWN_BANNER_WIDTH = 100;
+        var TURN_COUNTDOWN_TEXT_HEIGHT = 15;
+        var TURN_COUNTDOWN_TEXT_WIDTH = 80;
+
+        countdown_rect =
+//          g.rect((SURFACE_WIDTH - SIDEBAR_WIDTH)/2 + SIDEBAR_WIDTH + TURN_INDICATOR_BANNER_WIDTH/2 + 35,
+            g.rect(SURFACE_WIDTH - TURN_COUNTDOWN_BANNER_WIDTH - RIGHT_MARGIN,
+               SURFACE_HEIGHT / 2 - TURN_COUNTDOWN_BANNER_HEIGHT/2,
+               TURN_COUNTDOWN_BANNER_WIDTH,
+               TURN_COUNTDOWN_BANNER_HEIGHT
+               );
+        countdown_rect.attr({'fill':       'rgba(0, 0, 0, 0.05)',
+                             'stroke':      'rgba(0, 0, 0, 0.3)',
+                  });
+        countdown_text =
+            g.text(SURFACE_WIDTH - RIGHT_MARGIN - TURN_COUNTDOWN_TEXT_WIDTH,
+                   SURFACE_HEIGHT / 2 + TURN_COUNTDOWN_TEXT_HEIGHT/2,
+                   '15:33');
+        countdown_text.attr({'font-family': 'Garamond',
+                   'font-size':   '20pt',
+//                    'font-variant':'small-caps',
+                   'fill':       'rgba(0, 0, 0, 0.6)',
+                  });
+//         line.attr({clip: g.rect(15, 15, 15, 15)})
+        r1 = rect.clone();
+        r2 = countdown_rect.clone();
+        r3 = g.rect(0, 0, SURFACE_WIDTH, SURFACE_HEIGHT);
+        r3.attr({'fill':'#fff'});
+        r1.attr({'fill':'#000'});
+        r2.attr({'fill':'#000'});
+//         Snap.paper.g()
+//         console.log(Snap.paper)
+        m = g.g(r3, r1, r2);
+        line.attr({mask: m})
+
+    }
+    drawTurnIndicator();
+
+//     line.attr({stroke: '#000'})
 
     laneCentroids.map(function (coord, index) {
         var LANE_PADDING = CARD_WIDTH/4
