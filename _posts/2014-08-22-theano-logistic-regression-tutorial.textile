@@ -1,0 +1,185 @@
+---
+layout: post
+---
+h1. Logistic Regression/Softmax in Theano
+
+a beginner's tutorial
+
+
+h5. keywords: logistic regression, softmax, theano, python, tutorial, quickstart
+
+
+h2. Objective of this article
+
+* To quickly come to grips with the Theano framework
+with as little incidental complexity as possible
+
+* To build an implementation of logistic regression
+effective on the "MNIST handwritten digits data set":http://yann.lecun.com/exdb/mnist/
+using stochastic gradient descent.
+
+
+h2. Logistic regression mechanics summary
+
+h3. Define the input (x), parameters (W, b) and output classes (Y)
+
+Given an input with *m* dimensions (a vector with *m* elements) (for MNIST, *m*=28*28=768).
+a single input will be referred to as *x*, a list of inputs will be referred to as *X*.
+
+An input may be classified as any one of a set of **k** output classes (for MNIST, **k**=10 (digits 0-9))
+The set of output classes will be referred to as **Y**, a single output class as **y**.
+
+For each output class, a vector of **m** real-valued weights **W**, and a single bias weight **b**.
+Define a set of weights *W* and a bias *b* for each output class *y*.
+The "shape":http://docs.scipy.org/doc/numpy/reference/generated/numpy.ndarray.shape.html of *W* is *m* × *k* (for MNIST, 28x28x10),
+and the shape of *b* is *k* (for MNIST, 10).
+So there are a total of 28x28x10 + 10 = 7850 parameters in the model which we may adjust.
+
+h3. Calculate the probability of output classes, given the input and parameters
+
+Given *W*, *b*, we can calculate the predicted probability that input *x* is assigned label *y*, for each *y* in *Y*.
+The probability of each output class given an input will be denoted @P(Y|x)@. This could also be written @P(Y| x,W,b)@.
+
+**P(Y|x)** might look like this: @[0.05, 0.05, 0.03, 0.02, 0.56, 0.12, 0.04, 0.03, 0.08, 0.02]@
+In the example above, the probability of @Y[0]@ or equivalently written @P(Y=0|x)@ (digit 0) is 5%, the probability of @Y[4]@ or @P(Y=4|x)@ (digit 4) is 56%.
+Note that the sum of probabilities across **Y** must be equal to one.
+Selecting the index with the greatest probability suggest that this input will be classified as the digit 4.
+
+h3. Calculating P(Y|x)
+
+# Linear transform:  @x[0]*W[0] + x[1]*W[1] + ... + x[m]\*W[m] + b@ (for each output class...)
+   This operation is the [dot product](http://en.wikipedia.org/wiki/Dot_product) of @W@ and @x@, plus @b@. Equivalently: @W·x + b@
+   This might look like @[-7.06, -7.06, -8.34, -9.34, 0.57, -4.78, -7.62, -8.34, -5.86, -9.34]@
+# Non-linear transform: [logistic function](http://en.wikipedia.org/wiki/Logistic_function) of the output of the linear transform.
+   This might look like @[0.00085, 0.00085, 0.00023, 0.00001, 0.64079, 0.008311, 0.00048, 0.00023, 0.00283, 0.00001]@
+   This is almost interpretable as probabilities of output classes, except that the sum of probabilities is 0.65.
+   A probability distribution must sum to one.
+# Normalise probabilities: divide each output class probability by the sum of output class probabilities.
+   This might look like @[0.0013, 0.0013, 0.000364, 0.000134, 0.979, 0.0127, 0.000743, 0.000364, 0.00434, 0.000134]@
+   This is the "softmax function":http://en.wikipedia.org/wiki/Softmax_function.
+
+
+
+
+
+h2. Implementation in Theano
+
+h3. 1. Compose the "function graph":http://deeplearning.net/software/theano/tutorial/symbolic_graphs.html
+
+First step is to write down the mathematical relationships
+using theano "ops":http://deeplearning.net/software/theano/extending/graphstructures.html#op (T.mean, T.log, +, *, T.grad, ...),
+and theano "variables":http://deeplearning.net/software/theano/extending/graphstructures.html#variable (T.matrix, T.vector, ...).
+
+Each of these functions returns a symbolic Theano function.
+
+{% highlight python %}
+import theano
+import theano.tensor as T
+
+def p_y_given_x(x, W, b):
+    '''compute vector of output class membership probabilities
+    return a matrix, one row for each training example, one column for each output class,
+    each cell contains the predicted probability of each output class'''
+    return T.nnet.softmax(T.dot(x, W) + b) # returns a theano graph structure
+
+def negative_log_likelihood(x, y, W, b):
+    '''given the correct training label, return how good these parameters W, b are at selecting the correct y'''
+    return -T.mean(T.log(p_y_given_x(x, W, b)) [T.arange(y.shape[0]), y])
+
+# updating parameters symbolically is described by a vector of 2-tuples,
+# each tuple is (<symbolic variable name>, <symbolic function of new value of variable>)
+def updates (x, y, W, b, epsilon):
+    '''return a list of parameters to update, and how to get their new value'''
+    return [(W, W - epsilon * T.grad(cost=negative_log_likelihood(x, y, W, b), wrt=W)),
+            (b, W - epsilon * T.grad(cost=negative_log_likelihood(x, y, W, b), wrt=b))
+
+def errors(x, y, W, b):
+    '''return percentage of classification errors for these parameters W, b, on this test set x,y'''
+    return T.mean(T.neq(T.argmax(p_y_given_x(x, W, b), axis=1), y))
+{% endhighlight %}
+
+
+h3. 2. Compile the symbolic graph into a callable function
+
+The symbolic function graph is compiled into a callable python function, with "theano.function":http://deeplearning.net/software/theano/library/compile/function.html.
+
+h4. Parameters to theano.function
+
+h5. Inputs
+
+Parameters that will be passed each time the function is called.
+Note that this data will need to be copied to the GPU on each call.
+
+h5. Givens
+
+Parameters to set into the callable function's environment at graph compile time, accessible from within the function at any time.
+Typically, this is the best place to set training data (if it will fit into memory), as it then does not need to be recopied.
+
+h5. Updates
+
+Defines changes to make to "variables":http://deeplearning.net/software/theano/extending/graphstructures.html#variable.
+Defined as a list of 2-tuples, where the first element is the variable to update, and the second element is an "op":http://deeplearning.net/software/theano/extending/graphstructures.html#op which returns its new value.
+
+h5. Outputs
+
+An op which will be executed, and its return value returned from the callable function.
+
+
+
+{% highlight python %}
+# these definitions must be provided because
+# theano.function compiles a function (perhaps natively)
+# which requires type information
+x = T.matrix('x')
+y = T.vector('y', dtype='int32')
+
+# initialise model parameters
+n_in = 28*28 #input size
+n_out = 10    #class count
+W = theano.shared(value=zeros((n_in, n_out), dtype=theano.config.floatX), name='W', borrow=True)
+b = theano.shared(value=zeros((n_out,),      dtype=theano.config.floatX), name='b', borrow=True)
+
+
+epsilon = 0.3
+train_model_fn = theano.function(inputs=[x, y],                               # accept x,y as parameters
+                                 givens={W:W, b:b},                           # establish W,b as internal givens
+                                 outputs=negative_log_likelihood(x, y, W, b), # return this value when I run the function
+                                 updates=updates (x, y, W, b, epsilon),)      # make these variable changes
+
+test_model_fn = theano.function(inputs=[x, y],
+                                givens={W:W, b:b},
+                                outputs=errors(x, y, W, b))
+{% endhighlight %}
+
+h3. 3. Execute the function
+
+The return value from theano.function can be executed as a normal python function.
+Variables specified by updates will be changed, and the value calculated by the outputs op will be returned.
+
+{% highlight python %}
+# load training and testing data sets
+train_X, train_y = read_mnist(range (10), "training")
+test_X, test_y = read_mnist(range (10), "testing")
+
+# build a super-simple mini-batch training loop
+batch_size=200
+epochs = 30
+start_time = time.time()
+for i in range(epochs):
+    for j in range(len(train_X) / batch_size):
+        mini_batch_x = train_X[j * batch_size:(j+1) * batch_size]
+        mini_batch_y = train_y[j * batch_size:(j+1) * batch_size]
+        likelihood   = train_model(mini_batch_x, mini_batch_y)
+    score = test_model(test_X, test_y)
+    print likelihood, score
+elapsed = time.time()-start_time
+
+final_score = prediction_score(predict_y(test_X, W, b), test_y)
+print "time: {0:.2f} seconds, score: {1:.4f}".format(elapsed, final_score)
+{% endhighlight %}
+
+
+
+
+
+
